@@ -11,7 +11,7 @@ ibm_data <- read_html("https://www.ibm.com/communities/analytics/watson-analytic
 churn <- ibm_data %>% 
         html_nodes("p:nth-child(17) a") %>% # nodes are based on number instead of text, number may change.
         html_attr("href") %>%  # Get the link
-        read.csv() # Load dataset
+        read.csv(.,header=T,na.strings=c("")) # Load dataset
 
 sapply(churn,function(x) sum(is.na(x))) # count how many missing values in each column
 churn <- churn[complete.cases(churn),] # Complete.cases on rows select rows with no missing values.
@@ -131,5 +131,8 @@ training<- churn[intrain,]
 testing<- churn[-intrain,]
 
 #Fitting the Logistic Regression Model
-LogModel <- glm(churn ~ .,family = binomial(link = "logit"),data = training)
+LogModel <- glm(churn~.,family = binomial(link = "logit"),data = training)
 print(summary(LogModel))
+glm(formula = churn ~ ., family = binomial(link = "logit"), data = training)
+
+anova(LogModel, test="Chisq")
