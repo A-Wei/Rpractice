@@ -1,6 +1,7 @@
 # This script is a walk throught of this artical in r-blogger for predition models
 # https://www.r-bloggers.com/predict-customer-churn-logistic-regression-decision-tree-and-random-forest/
 
+# 1.Data Preprocessing
 # Set wd to file folder and load packages
 setwd("/Users/wei/Documents/R/Predict_Customer_Churn")
 require("pacman")
@@ -51,7 +52,7 @@ churn$SeniorCitizen <- as.factor(mapvalues(churn$SeniorCitizen,
 churn$customerID <- NULL
 churn$tenure <- NULL
 
-# Exploratory data analysis and feature selection
+# 2.Exploratory data analysis and feature selection
 numeric.var <- sapply(churn, is.numeric)
 corr.matrix <- cor(churn[,numeric.var])
 corrplot(corr.matrix, main="\n\nCorrelation Plot for Numerical Variables", method="number")
@@ -123,8 +124,8 @@ p17 <- ggplot(churn, aes(x=tenure_group)) + ggtitle("Tenure Group") + xlab("Tenu
         geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
 grid.arrange(p13, p14, p15, p16, p17, ncol=2)
 
+# 3.Logistic Regression
 #First, we split the data into training and testing sets
-
 intrain<- createDataPartition(churn$Churn,p=0.7,list=FALSE)
 set.seed(2017)
 training<- churn[intrain,]
@@ -135,5 +136,62 @@ testing<- churn[-intrain,]
 LogModel <- glm(Churn~.,family = binomial(link = "logit"), data = training) 
 print(summary(LogModel))
 
-#The top three most-relevant features include Contract, tenure_group and PaperlessBilling.
+#Feature Analysis, the top three most-relevant features include Contract, tenure_group and PaperlessBilling.
 anova(LogModel, test="Chisq")
+
+#Assessing the predictive ability of the Logistic Regression model
+testing$Churn <- as.character(testing$Churn)
+testing$Churn[testing$Churn=="No"] <- "0"
+testing$Churn[testing$Churn=="Yes"] <- "1"
+fitted.results <- predict(LogModel,newdata=testing,type='response')
+#fitted.results  0.5,1,0) <- is the incomplete code
+misClasificError <- mean(fitted.results != testing$Churn)
+print(paste('Logistic Regression Accuracy',1-misClasificError))
+
+#Logistic Regression Confusion Matrix
+print("Confusion Matrix for Logistic Regression"); 
+table(testing$Churn, fitted.results > 0.5)
+
+#Odds Ratio， One of the interesting performance measurements in logistic regression is Odds Ratio.Basically, Odds ratio is what the odds of an event is happening.
+exp(cbind(OR=coef(LogModel), confint(LogModel)))
+
+
+#4. Decision Tree
+tree <- ctree(Churn~Contract+tenure_group+PaperlessBilling, training)
+plot(tree, type='simple')
+pred_tree <- predict(tree, testing)
+print("Confusion Matrix for Decision Tree")
+table(Predicted = pred_tree, Actual = testing$Churn)
+
+# Decision tree accuracy
+p1 <- predict(tree, training)
+tab1 <- table(Predicted = p1, Actual = training$Churn)
+tab2 <- table(Predicted = pred_tree, Actual = testing$Churn)
+print(paste('Decision Tree Accuracy',sum(diag(tab2))/sum(tab2)))
+
+#5.Random Forest
+rfModel <- randomForest(Churn ~., data = training)
+print(rfModel)
+pred_rf <- predict(rfModel, testing)
+caret::confusionMatrix(pred_rf, testing$Churn)
+#We use this plot to help us determine the number of trees. As the number of trees increases, the OOB error rate decreases, and then becomes almost constant. We are not able to decrease the OOB error rate after about 100 to 200 trees.
+plot(rfModel)
+
+
+#Tune Random Forest Model
+#We use this plot to give us some ideas on the number of mtry to choose. OOB error rate is at the lowest when mtry is 2. Therefore, we choose mtry=2.
+t <- tuneRF(training[, -18], training[, 18], stepFactor = 0.5, plot = TRUE, ntreeTry = 200, trace = TRUE, improve = 0.05)
+
+#Fit the Random Forest Model After Tuning
+rfModel_new <- randomForest(Churn ~., data = training, ntree = 200, mtry = 2, importance = TRUE, proximity = TRUE)
+print(rfModel_new)
+
+#Random Forest Predictions and Confusion Matrix After Tuning
+pred_rf_new <- predict(rfModel_new, testing)
+caret::confusionMatrix(pred_rf_new, testing$Churn)
+
+#Random Forest Feature Importance
+varImpPlot(rfModel_new, sort=T, n.var = 10, main = 'Top 10 Feature Importance')
+
+
+
