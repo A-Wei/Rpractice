@@ -131,8 +131,9 @@ training<- churn[intrain,]
 testing<- churn[-intrain,]
 
 #Fitting the Logistic Regression Model
-LogModel <- glm(churn~.,family = binomial(link = "logit"),data = training)
+#This part throw an error "invalid type (list) for variable 'churn'", that because Churn (capital C) is a column in training dataset but churn is a dataframe
+LogModel <- glm(Churn~.,family = binomial(link = "logit"), data = training) 
 print(summary(LogModel))
-glm(formula = churn ~ ., family = binomial(link = "logit"), data = training)
 
+#The top three most-relevant features include Contract, tenure_group and PaperlessBilling.
 anova(LogModel, test="Chisq")
